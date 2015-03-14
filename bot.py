@@ -61,9 +61,22 @@ class Bot(object):
                     self.update_game_state(parts[0], parts[1], parts[2])
                     pass
                 elif command == 'action':
-                    stdout.write(self.make_move(parts[2]) + '\n')
-                    stdout.flush()
-                    pass
+                    if not self.match_settings['table']:
+                        stdout.write(self.preflop(parts[2]) + '\n')
+                        stdout.flush()
+                        pass
+                    elif self.match_settings['table'].len() == 3:
+                        stdout.write(self.flop(parts[2]) + '\n')
+                        stdout.flush()
+                        pass
+                    elif self.match_settings['table'].len() == 4:
+                        stdout.write(self.turn(parts[2]) + '\n')
+                        stdout.flush()
+                        pass
+                    elif self.match_settings['table'].len() == 4:
+                        stdout.write(self.river(parts[2]) + '\n')
+                        stdout.flush()
+                        pass
                 else:
                     stderr.write('Unknown command: %s\n' % (command))
                     stderr.flush()
@@ -128,7 +141,7 @@ class Bot(object):
             elif info_type == 'wins':
                 pass
 
-    def make_move(self, timeout):
+    def preflop(self, timeout):
         '''
         Checks cards and makes a move
         '''
@@ -158,6 +171,10 @@ class Bot(object):
         
         #suited connectors
         elif card1.suit == card2.suit and abs(card1.number - card2.number) == 1:
+            return 'raise ' + str(2 * int(self.match_settings['big_blind']))
+
+        #suited ace
+        elif card1.suit == card2.suit and (card1.number == 12 or card2.number == 12):
             return 'raise ' + str(2 * int(self.match_settings['big_blind']))
 
         else:
