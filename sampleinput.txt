@@ -1,0 +1,55 @@
+Settings time_bank 10000
+Settings time_per_move 500
+Settings hands_per_level 10
+Settings starting_stack 2000
+Settings your_bot player1
+
+Match round 1
+Match small_blind 10
+Match big_blind 20
+Match on_button player1
+
+player1 stack 2000
+player2 stack 2000
+player1 post 15
+player2 post 30
+player1 hand [7s,7h]
+
+Match max_win_pot 30
+Match amount_to_call 10
+Action player1 10000
+
+call 0 //output from bot
+player1 call 10
+player2 check 0
+
+Match table [7s,Js,Kh]
+player2 check 0
+Match max_win_pot 40
+Match amount_to_call 0
+Action player1 9500
+
+call 0 //output from bot
+player1 check 0
+
+Match table [7s,Js,Kh,2h]
+player2 check 0
+Match max_win_pot 40
+Match amount_to_call 0
+Action player1 98000
+raise 30 //output from bot
+player1 raise 30
+player2 call 30
+
+Match table [7s,Js,Kh,2h,5h]
+player2 check 0
+Match max_win_pot 120
+Match amount_to_call 0
+Action player1 10000
+raise 200 //output from bot
+player1 raise 200
+player2 call 200
+
+player1 hand [3h,7h]
+player2 hand [Jd,Td]
+player1 wins 520
