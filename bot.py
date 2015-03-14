@@ -167,6 +167,45 @@ class Bot(object):
         else:
             return 'check 0'
 
+    def flop(self, timeout):
+        '''
+        Once the flop is out, action is to us
+        '''
+        card1 = self.bots['me']['pocket'].cards[0]
+        card2 = self.bots['me']['pocket'].cards[1]
+
+        #made hand
+
+        #flush draw
+
+        #straight draw
+
+        #ace high?
+
+    def turn(self, timeout):
+        '''
+        Once the turn is out, action is to us
+        '''
+        card1 = self.bots['me']['pocket'].cards[0]
+        card2 = self.bots['me']['pocket'].cards[1]
+
+        #made hand
+
+        #flush draw
+
+        #straight draw
+
+        #ace high?
+
+    def river(self, timeout):
+        '''
+        Once the flop is out, action is to us
+        '''
+        card1 = self.bots['me']['pocket'].cards[0]
+        card2 = self.bots['me']['pocket'].cards[1]
+
+        #made hand
+
 
     def parse_cards(self, cards_string):
         '''
