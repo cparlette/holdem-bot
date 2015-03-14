@@ -143,21 +143,8 @@ class Bot(object):
 
     def preflop(self, timeout):
         '''
-        Checks cards and makes a move
+        Handle preflop hand possibilities
         '''
-        """
-        # Get average card value
-        average_card_value = 0
-        for card in self.bots['me']['pocket']:
-            average_card_value += card.number
-        average_card_value /= 2
-
-        # Check if we have something good
-        if average_card_value > 8:
-            return 'raise ' + str(2 * int(self.match_settings['bigBlind']))
-        elif average_card_value > 4:
-            return 'call ' + self.match_settings['amountToCall']
-        """
         card1 = self.bots['me']['pocket'].cards[0]
         card2 = self.bots['me']['pocket'].cards[1]
 
