@@ -6,7 +6,8 @@
 # @license MIT License (http://opensource.org/licenses/MIT)
 
 from sys import stderr, stdin, stdout
-from poker import Card, Hand, Pocket, Table
+from poker import Card, Hand, Pocket, Table, Ranker
+from itertools import combinations
 
 class Bot(object):
     '''
@@ -26,6 +27,7 @@ class Bot(object):
             'me': {},
             'opponent': {}
         }
+        self.ranker = Ranker()
 
     def run(self):
         '''
@@ -61,19 +63,19 @@ class Bot(object):
                     self.update_game_state(parts[0], parts[1], parts[2])
                     pass
                 elif command == 'action':
-                    if not self.match_settings['table']:
+                    if 'table' not in self.match_settings:
                         stdout.write(self.preflop(parts[2]) + '\n')
                         stdout.flush()
                         pass
-                    elif self.match_settings['table'].len() == 3:
+                    elif len(self.match_settings['table']) == 10:
                         stdout.write(self.flop(parts[2]) + '\n')
                         stdout.flush()
                         pass
-                    elif self.match_settings['table'].len() == 4:
+                    elif len(self.match_settings['table']) == 13:
                         stdout.write(self.turn(parts[2]) + '\n')
                         stdout.flush()
                         pass
-                    elif self.match_settings['table'].len() == 4:
+                    elif len(self.match_settings['table']) == 16:
                         stdout.write(self.river(parts[2]) + '\n')
                         stdout.flush()
                         pass
@@ -118,7 +120,8 @@ class Bot(object):
 
             # Round winnings, currently unused
             elif info_type == 'wins':
-                pass
+                if 'table' in self.match_settings:
+                    del self.match_settings['table']
 
             else:
                 stderr.write('Unknown info_type: %s\n' % (info_type))
@@ -139,7 +142,8 @@ class Bot(object):
 
             # Opponent round winnings, currently unused
             elif info_type == 'wins':
-                pass
+                if 'table' in self.match_settings:
+                    del self.match_settings['table']
 
     def preflop(self, timeout):
         '''
@@ -150,22 +154,26 @@ class Bot(object):
 
         #pocket pair
         if card1.number == card2.number:
-            return 'raise ' + str(2 * int(self.match_settings['big_blind']))
+            return 'raise ' + str(int(self.match_settings['max_win_pot']))
         
         #both face cards
         elif card1.number > 8 and card2.number > 8:
-            return 'raise ' + str(2 * int(self.match_settings['big_blind']))
+            return 'raise ' + str(int(self.match_settings['max_win_pot']))
         
         #suited connectors
         elif card1.suit == card2.suit and abs(card1.number - card2.number) == 1:
-            return 'raise ' + str(2 * int(self.match_settings['big_blind']))
+            return 'raise ' + str(int(self.match_settings['max_win_pot']))
 
         #suited ace
         elif card1.suit == card2.suit and (card1.number == 12 or card2.number == 12):
-            return 'raise ' + str(2 * int(self.match_settings['big_blind']))
+            return 'raise ' + str(int(self.match_settings['max_win_pot']))
 
-        else:
+        elif int(self.match_settings['amount_to_call']) == 0:
             return 'check 0'
+        elif int(self.match_settings['amount_to_call']) < int(self.match_settings['big_blind']):
+            return 'call 0'
+        else:
+            return 'fold 0'
 
     def flop(self, timeout):
         '''
@@ -174,13 +182,50 @@ class Bot(object):
         card1 = self.bots['me']['pocket'].cards[0]
         card2 = self.bots['me']['pocket'].cards[1]
 
+        available_cards = self.parse_cards(str(self.match_settings['table']))
+        available_cards.append(card1)
+        available_cards.append(card2)
+        ranking = self.ranker.rank_five_cards(available_cards)
+
         #made hand
+        if int(ranking[0]) > 1:
+            #already have 2pair or better, bet the pot
+            return 'raise ' + str(int(self.match_settings['max_win_pot']))
 
         #flush draw
+        flush_draw = False
+        suits = ""
+        for card in available_cards:
+            suits += card.suit
+        for card in available_cards:
+            if suits.count(card.suit) > 3:
+                flush_draw = True
+        if flush_draw:
+            return 'raise ' + str(int(self.match_settings['max_win_pot']) / 2)
 
         #straight draw
+        values = sorted(['23456789TJQKA'.find(card.value) for card in available_cards])
+        #check cards 0-3
+        straight_draw = all(values[i] == values[0] + i for i in range(4))
+        #check if we have A-4
+        if not straight_draw:
+            straight_draw = all(values[i] == values[0] + i for i in range(3)) and values[4] == 12
+        #check cards 1-4
+        if not straight_draw:
+            straight_draw = all(values[i+1] == values[1] + i for i in range(4))
+        if straight_draw:
+            return 'raise ' + str(int(self.match_settings['max_win_pot']) / 2)
 
-        #ace high?
+        #pair or ace high
+        if int(ranking[0]) == 1 or values[4] == 12:
+            if int(self.match_settings['amount_to_call']) < (3 * int(self.match_settings['big_blind'])) and int(self.match_settings['amount_to_call']) > 0:
+                return 'call 0'
+
+        if int(self.match_settings['amount_to_call']) == 0:
+            return 'check 0'
+        else:
+            return 'fold 0'
+
 
     def turn(self, timeout):
         '''
@@ -189,13 +234,59 @@ class Bot(object):
         card1 = self.bots['me']['pocket'].cards[0]
         card2 = self.bots['me']['pocket'].cards[1]
 
+        available_cards = self.parse_cards(str(self.match_settings['table']))
+        available_cards.append(card1)
+        available_cards.append(card2)
+        ranking = None
+        for five_cards in combinations(available_cards, 5):
+            if not ranking:
+                ranking = self.ranker.rank_five_cards(available_cards)
+            else:
+                temp_ranking = self.ranker.rank_five_cards(available_cards)
+                if int(temp_ranking[0]) > int(ranking[0]):
+                    ranking = temp_ranking
+
         #made hand
+        if int(ranking[0]) > 1:
+            #already have 2pair or better, bet the pot
+            return 'raise ' + str(int(self.match_settings['max_win_pot']))
 
         #flush draw
+        flush_draw = False
+        suits = ""
+        for card in available_cards:
+            suits += card.suit
+        for card in available_cards:
+            if suits.count(card.suit) > 3:
+                flush_draw = True
+        if flush_draw:
+            return 'call 0'
 
         #straight draw
+        values = sorted(['23456789TJQKA'.find(card.value) for card in available_cards])
+        #check cards 0-3
+        straight_draw = all(values[i] == values[0] + i for i in range(4))
+        #check if we have A-4
+        if not straight_draw:
+            straight_draw = all(values[i] == values[0] + i for i in range(3)) and values[4] == 12
+        #check cards 1-4
+        if not straight_draw:
+            straight_draw = all(values[i+1] == values[1] + i for i in range(4))
+        #check cards 2-5
+        if not straight_draw:
+            straight_draw = all(values[i+2] == values[2] + i for i in range(4))
+        if straight_draw:
+            return 'call 0'
 
-        #ace high?
+        #pair or ace high
+        if int(ranking[0]) == 1 or values[4] == 12:
+            if int(self.match_settings['amount_to_call']) < (3 * int(self.match_settings['big_blind'])) and int(self.match_settings['amount_to_call']) > 0:
+                return 'call 0'
+
+        if int(self.match_settings['amount_to_call']) == 0:
+            return 'check 0'
+        else:
+            return 'fold 0'
 
     def river(self, timeout):
         '''
@@ -205,6 +296,29 @@ class Bot(object):
         card2 = self.bots['me']['pocket'].cards[1]
 
         #made hand
+        card1 = self.bots['me']['pocket'].cards[0]
+        card2 = self.bots['me']['pocket'].cards[1]
+
+        available_cards = self.parse_cards(str(self.match_settings['table']))
+        available_cards.append(card1)
+        available_cards.append(card2)
+        ranking = None
+        for five_cards in combinations(available_cards, 5):
+            if not ranking:
+                ranking = self.ranker.rank_five_cards(available_cards)
+            else:
+                temp_ranking = self.ranker.rank_five_cards(available_cards)
+                if int(temp_ranking[0]) > int(ranking[0]):
+                    ranking = temp_ranking
+
+        #made hand
+        if int(ranking[0]) > 1:
+            #already have 2pair or better, bet the pot
+            return 'raise ' + str(int(self.match_settings['max_win_pot']))
+        elif int(self.match_settings['amount_to_call']) == 0:
+            return 'check 0'
+        else:
+            return 'fold 0'
 
 
     def parse_cards(self, cards_string):
